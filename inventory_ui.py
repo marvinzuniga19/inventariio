@@ -1,6 +1,6 @@
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
-from tkinter import messagebox, filedialog
+from tkinter import messagebox, filedialog, Toplevel, Canvas, PanedWindow
 from inventory_model import InventarioModel
 import csv
 from datetime import datetime
@@ -11,10 +11,23 @@ class InventarioUI:
     def __init__(self, controller=None):
         self.controller = controller
         self.model = controller.model if controller else InventarioModel()
-        self.app = tb.Window(themename="superhero")
+        
+        # Load theme from configuration
+        from inventory_config import Config
+        self.config = Config()
+        self.current_theme = self.config.get('ui', 'theme', 'superhero')
+        
+        # Initialize app with dynamic theme
+        self.app = tb.Window(themename=self.current_theme)
         self.app.title("Gestor de Inventario")
-        self.app.geometry("700x500")
+        self.app.geometry("900x600")  # Updated for sidebar
         self.editando_id = None
+        
+        # Available themes
+        self.light_themes = ['cosmo', 'flatly', 'litera', 'minty', 'lumen', 'sandstone', 'yeti', 'pulse', 'united', 'morph', 'journal', 'simplex', 'cerculean']
+        self.dark_themes = ['darkly', 'superhero', 'solar', 'cyborg', 'vapor']
+        self.all_themes = self.light_themes + self.dark_themes
+        
         self._crear_ui()
         self.cargar_productos()
         self.actualizar_estadisticas()
@@ -26,9 +39,280 @@ class InventarioUI:
         """Run the application."""
         self.app.mainloop()
 
+    def switch_theme(self, theme_name):
+        """Switch application theme dynamically and save to configuration"""
+        if theme_name in self.all_themes:
+            try:
+                # Apply theme
+                self.app.style.theme_use(theme_name)
+                self.current_theme = theme_name
+                
+                # Save to configuration (simple approach)
+                import json
+                with open('config.json', 'r') as f:
+                    config_data = json.load(f)
+                config_data['ui']['theme'] = theme_name
+                with open('config.json', 'w') as f:
+                    json.dump(config_data, f, indent=2)
+                
+                print(f"✅ Theme changed to: {theme_name}")
+            except Exception as e:
+                print(f"❌ Error switching theme: {e}")
+        else:
+            print(f"⚠️ Theme '{theme_name}' not available")
+
+    def create_theme_selector(self):
+        """Create theme selection dialog"""
+        dialog = Toplevel(self.app)
+        dialog.title("Seleccionar Tema")
+        dialog.geometry("400x500")
+        dialog.transient(self.app)
+        dialog.grab_set()
+        
+        # Theme preview frame
+        preview_frame = tb.Frame(dialog, padding=20)
+        preview_frame.pack(fill=BOTH, expand=True)
+        
+        tb.Label(preview_frame, text="🎨 Seleccionar Tema", font=("Arial", 14, "bold")).pack(pady=10)
+        
+        # Theme selection using buttons instead of listbox
+        scroll_frame = tb.Frame(preview_frame)
+        scroll_frame.pack(fill=BOTH, expand=True, pady=10)
+        
+        # Create canvas for scrolling
+        from tkinter import Canvas as tkCanvas
+        canvas = tkCanvas(scroll_frame)
+        scrollbar = tb.Scrollbar(scroll_frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = tb.Frame(canvas)
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Add theme buttons
+        for i, theme in enumerate(self.all_themes):
+            theme_type = "🌙" if theme in self.dark_themes else "☀️"
+            
+            def make_theme_callback(thm):
+                return lambda: self.switch_theme_and_close(thm, dialog)
+            
+            btn = tb.Button(
+                scrollable_frame,
+                text=f"{theme_type} {theme.title()}",
+                bootstyle=SUCCESS if theme == self.current_theme else PRIMARY,
+                command=make_theme_callback(theme),
+                width=30
+            )
+            btn.pack(pady=2, padx=10, fill=X)
+        
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Close button
+        tb.Button(preview_frame, text="Cerrar", bootstyle=SECONDARY, command=dialog.destroy).pack(pady=10)
+
+    def switch_theme_and_close(self, theme_name, dialog):
+        """Switch theme and close dialog"""
+        self.switch_theme(theme_name)
+        dialog.destroy()
+
     def _crear_ui(self):
-        frame_form = tb.Frame(self.app, padding=10)
-        frame_form.pack(fill=X)
+        # Create main paned window for two-column layout
+        self.main_paned = PanedWindow(self.app, orient="horizontal", bg="#2b2b2b")
+        self.main_paned.pack(fill="both", expand=True)
+        
+        # Create left sidebar
+        self.sidebar_collapsed = False
+        self.sidebar_frame = tb.Frame(self.main_paned, padding=10, bootstyle="dark", width=220)
+        self.main_paned.add(self.sidebar_frame)
+        
+        # Create right content area
+        self.content_frame = tb.Frame(self.main_paned, padding=10)
+        self.main_paned.add(self.content_frame)
+        
+        # Setup modern sidebar
+        self._crear_sidebar_moderno()
+        
+        # Setup main content area
+        self._crear_contenido_principal()
+
+    def _crear_sidebar_moderno(self):
+        """Create modern sidebar navigation with organized sections"""
+        # Define sidebar sections with logical grouping
+        self.sidebar_sections = {
+            "📦 Productos": [
+                ("➕ Agregar", self.agregar_producto, "success", "Ctrl+N"),
+                ("✏️ Editar", self.editar_producto, "info", ""),
+                ("🗑️ Eliminar", self.eliminar_producto, "danger", "Delete")
+            ],
+            "📊 Reportes": [
+                ("⚠️ Alertas", self.mostrar_alertas_stock, "warning", ""),
+                ("📈 Estadísticas", self.mostrar_estadisticas, "info", ""),
+                ("📄 Exportar CSV", self.exportar_csv, "primary", ""),
+                ("📑 Generar PDF", self.generar_pdf, "secondary", "")
+            ],
+            "⚙️ Herramientas": [
+                ("💾 Backup", self.backup_database, "primary", ""),
+                ("🔄 Restore", self.restore_database, "warning", "")
+            ],
+            "🎨 Apariencia": [
+                ("🎨 Cambiar Tema", self.create_theme_selector, "dark", ""),
+                ("🌓 Modo Tema", self.toggle_theme_mode, "light", "")
+            ]
+        }
+        
+        # Store section states (all expanded by default)
+        self.section_states = {section: True for section in self.sidebar_sections}
+        
+        # Create sidebar content
+        self._crear_sidebar_contenido()
+
+    def _crear_seccion_sidebar(self, section_name, buttons):
+        """Create a collapsible section in sidebar"""
+        # Section frame
+        section_frame = tb.Frame(self.sidebar_frame)
+        section_frame.pack(fill="x", pady=5)
+        
+        # Header button with toggle
+        def make_toggle_callback(sec_name):
+            return lambda: self.toggle_section(sec_name)
+        
+        header_btn = tb.Button(
+            section_frame,
+            text=f"{'▼' if self.section_states[section_name] else '▶'} {section_name}",
+            bootstyle="secondary",
+            command=make_toggle_callback(section_name),
+            width=20
+        )
+        header_btn.pack(fill="x")
+        
+        # Store reference for updating
+        attr_name = section_name.replace(" ", "_").replace("á", "a").replace("í", "i").replace("é", "e")
+        setattr(self, f"header_{attr_name}", header_btn)
+        
+        # Buttons container
+        buttons_container = tb.Frame(self.sidebar_frame)
+        buttons_container.pack(fill="x", pady=2)
+        
+        # Store reference
+        setattr(self, f"container_{attr_name}", buttons_container)
+        
+        # Create buttons with improved styling
+        for button_text, command, bootstyle, shortcut in buttons:
+            btn = tb.Button(
+                buttons_container,
+                text=f"  {button_text}",
+                bootstyle=bootstyle,
+                command=command,
+                width=18
+            )
+            btn.pack(pady=2, fill="x")
+            
+            # Add enhanced tooltip
+            if shortcut:
+                self.create_tooltip(btn, button_text.replace("📄 ", "").replace("📑 ", ""), shortcut)
+            else:
+                self.create_tooltip(btn, button_text.replace("📄 ", "").replace("📑 ", ""))
+
+    def toggle_section(self, section_name):
+        """Toggle a sidebar section visibility"""
+        self.section_states[section_name] = not self.section_states[section_name]
+        
+        # Update header button
+        attr_name = section_name.replace(" ", "_").replace("á", "a").replace("í", "i").replace("é", "e")
+        header_btn = getattr(self, f"header_{attr_name}")
+        header_btn.config(text=f"{'▼' if self.section_states[section_name] else '▶'} {section_name}")
+        
+        # Toggle buttons container
+        container = getattr(self, f"container_{attr_name}")
+        if self.section_states[section_name]:
+            container.pack(fill="x", pady=2)
+        else:
+            container.pack_forget()
+
+    def toggle_theme_mode(self):
+        """Quick toggle between a light and dark theme"""
+        current_is_dark = self.current_theme in self.dark_themes
+        if current_is_dark:
+            # Switch to light theme
+            self.switch_theme('cosmo')
+        else:
+            # Switch to dark theme
+            self.switch_theme('superhero')
+
+    def toggle_sidebar(self):
+        """Toggle sidebar collapse/expand functionality"""
+        if self.sidebar_collapsed:
+            # Expand sidebar
+            self.sidebar_collapsed = False
+            self.btn_toggle_sidebar.config(text="◀")
+            
+            # Restore sidebar content
+            self._restore_sidebar_content()
+        else:
+            # Collapse sidebar
+            self.sidebar_collapsed = True
+            self.btn_toggle_sidebar.config(text="☰")
+            
+            # Collapse sidebar content
+            self._collapse_sidebar_content()
+
+    def _restore_sidebar_content(self):
+        """Restore full sidebar content"""
+        # Clear sidebar completely
+        for widget in self.sidebar_frame.winfo_children():
+            widget.destroy()
+        
+        # Recreate full sidebar content
+        self._crear_sidebar_contenido()
+
+    def _collapse_sidebar_content(self):
+        """Collapse sidebar to minimal state"""
+        # Clear sidebar completely
+        for widget in self.sidebar_frame.winfo_children():
+            widget.destroy()
+        
+        # Create collapsed sidebar with just toggle button
+        self.btn_toggle_sidebar = tb.Button(
+            self.sidebar_frame, 
+            text="☰", 
+            bootstyle="secondary",
+            command=self.toggle_sidebar,
+            width=3
+        )
+        self.btn_toggle_sidebar.pack(pady=20, expand=True, fill="both")
+        self.create_tooltip(self.btn_toggle_sidebar, "Expandir barra lateral")
+
+    def _crear_sidebar_contenido(self):
+        """Create sidebar content without recreating the entire structure"""
+        # Toggle button
+        self.btn_toggle_sidebar = tb.Button(
+            self.sidebar_frame, 
+            text="◀", 
+            bootstyle="secondary",
+            command=self.toggle_sidebar,
+            width=3
+        )
+        self.btn_toggle_sidebar.pack(pady=5)
+        self.create_tooltip(self.btn_toggle_sidebar, "Colapsar/Expandir barra lateral")
+        
+        # Title
+        tb.Label(self.sidebar_frame, text="🎯 Navegación", 
+                font=("Arial", 12, "bold"), bootstyle="primary").pack(pady=10)
+        
+        # Recreate sections
+        for section_name, buttons in self.sidebar_sections.items():
+            self._crear_seccion_sidebar(section_name, buttons)
+
+    def _crear_contenido_principal(self):
+        """Create main content area optimized for reduced width"""
+        # Form frame for product entry
+        frame_form = tb.Frame(self.content_frame, padding=10)
+        frame_form.pack(fill="x")
 
         self.entry_nombre = tb.Entry(frame_form)
         self.entry_cantidad = tb.Entry(frame_form)
@@ -53,64 +337,33 @@ class InventarioUI:
             elif text == "Stock Mínimo":
                 self.create_tooltip(entries[i], "Alerta cuando el stock sea igual o menor")
 
-        self.btn_agregar = tb.Button(frame_form, text="➕ Agregar", bootstyle=SUCCESS, command=self.agregar_producto)
-        self.btn_agregar.grid(row=1, column=3, padx=10)
-        self.create_tooltip(self.btn_agregar, "Agregar nuevo producto (Ctrl+N)")
+# Note: All action buttons are now in the modern sidebar
+        # Form only contains input fields for data entry
         
-        self.btn_editar = tb.Button(frame_form, text="✏️ Editar", bootstyle=INFO, command=self.editar_producto)
-        self.btn_editar.grid(row=1, column=4, padx=10)
-        self.create_tooltip(self.btn_editar, "Editar producto seleccionado")
-        
-        self.btn_eliminar = tb.Button(frame_form, text="🗑️ Eliminar", bootstyle=DANGER, command=self.eliminar_producto)
-        self.btn_eliminar.grid(row=1, column=5, padx=10)
-        self.create_tooltip(self.btn_eliminar, "Eliminar producto seleccionado (Delete)")
-        
-        self.btn_exportar = tb.Button(frame_form, text="📄 Exportar", bootstyle=PRIMARY, command=self.exportar_csv)
-        self.btn_exportar.grid(row=1, column=6, padx=10)
-        self.create_tooltip(self.btn_exportar, "Exportar inventario a CSV")
-        
-        self.btn_alertas = tb.Button(frame_form, text="⚠️ Alertas", bootstyle=WARNING, command=self.mostrar_alertas_stock)
-        self.btn_alertas.grid(row=1, column=7, padx=10)
-        self.create_tooltip(self.btn_alertas, "Ver productos con stock bajo")
-        
-        self.btn_estadisticas = tb.Button(frame_form, text="📊 Estadísticas", bootstyle=INFO, command=self.mostrar_estadisticas)
-        self.btn_estadisticas.grid(row=1, column=8, padx=10)
-        self.create_tooltip(self.btn_estadisticas, "Ver estadísticas del inventario")
-        
-        self.btn_pdf = tb.Button(frame_form, text="📑 PDF", bootstyle=SECONDARY, command=self.generar_pdf)
-        self.btn_pdf.grid(row=1, column=9, padx=10)
-        self.create_tooltip(self.btn_pdf, "Generar reporte PDF")
-        
-        self.btn_backup = tb.Button(frame_form, text="💾 Backup", bootstyle=PRIMARY, command=self.backup_database)
-        self.btn_backup.grid(row=1, column=10, padx=10)
-        self.create_tooltip(self.btn_backup, "Crear copia de seguridad")
-        
-        self.btn_restore = tb.Button(frame_form, text="🔄 Restore", bootstyle=WARNING, command=self.restore_database)
-        self.btn_restore.grid(row=1, column=11, padx=10)
-        self.create_tooltip(self.btn_restore, "Restaurar desde copia")
-
-        frame_search = tb.Frame(self.app, padding=10)
-        frame_search.pack(fill=X)
+        # Search frame - FIXED: using content_frame instead of app
+        frame_search = tb.Frame(self.content_frame, padding=10)
+        frame_search.pack(fill="x")
         
         tb.Label(frame_search, text="🔍 Buscar:").pack(side=LEFT, padx=5)
         self.entry_busqueda = tb.Entry(frame_search)
         self.entry_busqueda.pack(side=LEFT, fill=X, expand=True, padx=5)
         self.entry_busqueda.bind("<KeyRelease>", self.filtrar_productos)
-        self.create_tooltip(self.entry_busqueda, "Buscar productos (Ctrl+F)")
+        self.create_tooltip(self.entry_busqueda, "Buscar productos", "Ctrl+F")
         
         btn_limpiar = tb.Button(frame_search, text="🧹 Limpiar", bootstyle=SECONDARY, command=self.limpiar_busqueda)
         btn_limpiar.pack(side=LEFT, padx=5)
-        self.create_tooltip(btn_limpiar, "Limpiar búsqueda (Escape)")
+        self.create_tooltip(btn_limpiar, "Limpiar búsqueda", "Escape")
 
-        # Statistics panel
-        frame_stats = tb.Frame(self.app, padding=10)
-        frame_stats.pack(fill=X)
+        # Statistics panel - FIXED: using content_frame instead of app
+        frame_stats = tb.Frame(self.content_frame, padding=10)
+        frame_stats.pack(fill="x")
         
         self.stats_frame = frame_stats
         self.actualizar_estadisticas()
 
-        frame_tabla = tb.Frame(self.app, padding=10)
-        frame_tabla.pack(fill=BOTH, expand=True)
+        # Table frame - FIXED: using content_frame instead of app
+        frame_tabla = tb.Frame(self.content_frame, padding=10)
+        frame_tabla.pack(fill="both", expand=True)
 
         self.tabla = tb.Treeview(frame_tabla, columns=("ID", "Producto", "Cantidad", "Precio", "Stock Mínimo"), show="headings")
         for col in ("ID", "Producto", "Cantidad", "Precio", "Stock Mínimo"):
@@ -173,9 +426,8 @@ class InventarioUI:
             stock_minimo = str(producto[4]) if len(producto) > 4 else "10"
             self.entry_stock_minimo.insert(0, stock_minimo)
             
-            # Cambiar texto del botón de agregar a "Actualizar"
-            self.btn_agregar.config(text="💾 Actualizar", bootstyle=WARNING, command=self.actualizar_producto)
-            self.create_tooltip(self.btn_agregar, "Actualizar producto (Enter)")
+            # Note: Button modification removed - sidebar buttons are now used for all actions
+            # Edit mode is indicated by the filled form fields
 
     def actualizar_producto(self):
         nombre = self.entry_nombre.get()
@@ -207,16 +459,29 @@ class InventarioUI:
 
     def restaurar_boton_agregar(self):
         self.editando_id = None
-        self.btn_agregar.config(text="➕ Agregar", bootstyle=SUCCESS, command=self.agregar_producto)
-        self.create_tooltip(self.btn_agregar, "Agregar nuevo producto (Ctrl+N)")
+        # Note: Button restoration removed - sidebar buttons are now used for all actions
+        # Edit mode is indicated by the filled form fields
 
-    def create_tooltip(self, widget, text):
+    def create_tooltip(self, widget, text, shortcut=None):
         def on_enter(event):
-            tooltip = tb.Toplevel()
+            tooltip = Toplevel(widget)
             tooltip.wm_overrideredirect(True)
             tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
-            label = tb.Label(tooltip, text=text, background="lightyellow", relief="solid", borderwidth=1)
+            
+            # Create enhanced tooltip content
+            frame = tb.Frame(tooltip, bootstyle="light")
+            frame.pack(padx=5, pady=3)
+            
+            # Main text
+            label = tb.Label(frame, text=text, background="lightyellow", relief="solid", borderwidth=1)
             label.pack()
+            
+            # Add shortcut if provided
+            if shortcut:
+                shortcut_label = tb.Label(frame, text=f"⌨️  {shortcut}", background="#ffffcc", 
+                                       font=("Arial", 8, "bold"), relief="solid", borderwidth=1)
+                shortcut_label.pack(pady=(2, 0))
+            
             widget.tooltip = tooltip
 
         def on_leave(event):
