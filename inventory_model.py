@@ -68,3 +68,75 @@ class InventarioModel:
     def obtener_productos_bajo_stock(self):
         self.cursor.execute("SELECT * FROM productos WHERE cantidad <= stock_minimo")
         return self.cursor.fetchall()
+
+    def backup_database(self, backup_path):
+        import shutil
+        try:
+            # Close current connection
+            self.conn.close()
+            
+            # Copy database file
+            shutil.copy2(self.db_name if hasattr(self, 'db_name') else "inventario.db", backup_path)
+            
+            # Reopen connection
+            self.conn = sqlite3.connect(self.db_name if hasattr(self, 'db_name') else "inventario.db")
+            self.cursor = self.conn.cursor()
+            
+            return True
+        except Exception as e:
+            # Reopen connection if it failed
+            try:
+                self.conn = sqlite3.connect(self.db_name if hasattr(self, 'db_name') else "inventario.db")
+                self.cursor = self.conn.cursor()
+            except:
+                pass
+            raise e
+
+    def restore_database(self, backup_path):
+        import shutil
+        try:
+            # Close current connection
+            self.conn.close()
+            
+            # Copy backup file to current database
+            shutil.copy2(backup_path, self.db_name if hasattr(self, 'db_name') else "inventario.db")
+            
+            # Reopen connection
+            self.conn = sqlite3.connect(self.db_name if hasattr(self, 'db_name') else "inventario.db")
+            self.cursor = self.conn.cursor()
+            
+            return True
+        except Exception as e:
+            # Reopen connection if it failed
+            try:
+                self.conn = sqlite3.connect(self.db_name if hasattr(self, 'db_name') else "inventario.db")
+                self.cursor = self.conn.cursor()
+            except:
+                pass
+            raise e
+
+    def obtener_estadisticas(self):
+        productos = self.obtener_productos()
+        
+        total_productos = len(productos)
+        valor_total = sum(p[2] * p[3] for p in productos)
+        bajo_stock = len(self.obtener_productos_bajo_stock())
+        
+        # Product statistics
+        productos_sin_stock = len([p for p in productos if p[2] == 0])
+        valor_promedio = valor_total / total_productos if total_productos > 0 else 0
+        
+        # Stock statistics
+        stock_total = sum(p[2] for p in productos)
+        stock_minimo_total = sum(p[4] if len(p) > 4 else 10 for p in productos)
+        
+        return {
+            'total_productos': total_productos,
+            'valor_total': valor_total,
+            'bajo_stock': bajo_stock,
+            'sin_stock': productos_sin_stock,
+            'valor_promedio': valor_promedio,
+            'stock_total': stock_total,
+            'stock_minimo_total': stock_minimo_total,
+            'productos_criticos': bajo_stock + productos_sin_stock
+        }
