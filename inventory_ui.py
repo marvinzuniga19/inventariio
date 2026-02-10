@@ -1,0 +1,375 @@
+import ttkbootstrap as tb
+from ttkbootstrap.constants import *
+from tkinter import messagebox, filedialog
+from inventory_model import InventarioModel
+import csv
+from datetime import datetime
+
+
+class InventarioUI:
+    def __init__(self):
+        self.model = InventarioModel()
+        self.app = tb.Window(themename="superhero")
+        self.app.title("Gestor de Inventario")
+        self.app.geometry("700x500")
+        self.editando_id = None
+        self._crear_ui()
+        self.cargar_productos()
+        self.configurar_atajos()
+        self.app.mainloop()
+
+    def _crear_ui(self):
+        frame_form = tb.Frame(self.app, padding=10)
+        frame_form.pack(fill=X)
+
+        self.entry_nombre = tb.Entry(frame_form)
+        self.entry_cantidad = tb.Entry(frame_form)
+        self.entry_precio = tb.Entry(frame_form)
+        self.entry_stock_minimo = tb.Entry(frame_form, width=10)
+
+        labels = ["Producto", "Cantidad", "Precio", "Stock Mínimo"]
+        entries = [self.entry_nombre, self.entry_cantidad, self.entry_precio, self.entry_stock_minimo]
+
+        for i, text in enumerate(labels):
+            label = tb.Label(frame_form, text=text)
+            label.grid(row=0, column=i, padx=5)
+            entries[i].grid(row=1, column=i, padx=5)
+            
+            # Add tooltips
+            if text == "Producto":
+                self.create_tooltip(entries[i], "Nombre del producto (único)")
+            elif text == "Cantidad":
+                self.create_tooltip(entries[i], "Cantidad en stock (número entero)")
+            elif text == "Precio":
+                self.create_tooltip(entries[i], "Precio por unidad (decimal)")
+            elif text == "Stock Mínimo":
+                self.create_tooltip(entries[i], "Alerta cuando el stock sea igual o menor")
+
+        self.btn_agregar = tb.Button(frame_form, text="➕ Agregar", bootstyle=SUCCESS, command=self.agregar_producto)
+        self.btn_agregar.grid(row=1, column=3, padx=10)
+        self.create_tooltip(self.btn_agregar, "Agregar nuevo producto (Ctrl+N)")
+        
+        self.btn_editar = tb.Button(frame_form, text="✏️ Editar", bootstyle=INFO, command=self.editar_producto)
+        self.btn_editar.grid(row=1, column=4, padx=10)
+        self.create_tooltip(self.btn_editar, "Editar producto seleccionado")
+        
+        self.btn_eliminar = tb.Button(frame_form, text="🗑️ Eliminar", bootstyle=DANGER, command=self.eliminar_producto)
+        self.btn_eliminar.grid(row=1, column=5, padx=10)
+        self.create_tooltip(self.btn_eliminar, "Eliminar producto seleccionado (Delete)")
+        
+        self.btn_exportar = tb.Button(frame_form, text="📄 Exportar", bootstyle=PRIMARY, command=self.exportar_csv)
+        self.btn_exportar.grid(row=1, column=6, padx=10)
+        self.create_tooltip(self.btn_exportar, "Exportar inventario a CSV")
+        
+        self.btn_alertas = tb.Button(frame_form, text="⚠️ Alertas", bootstyle=WARNING, command=self.mostrar_alertas_stock)
+        self.btn_alertas.grid(row=1, column=7, padx=10)
+        self.create_tooltip(self.btn_alertas, "Ver productos con stock bajo")
+
+        frame_search = tb.Frame(self.app, padding=10)
+        frame_search.pack(fill=X)
+        
+        tb.Label(frame_search, text="🔍 Buscar:").pack(side=LEFT, padx=5)
+        self.entry_busqueda = tb.Entry(frame_search)
+        self.entry_busqueda.pack(side=LEFT, fill=X, expand=True, padx=5)
+        self.entry_busqueda.bind("<KeyRelease>", self.filtrar_productos)
+        self.create_tooltip(self.entry_busqueda, "Buscar productos (Ctrl+F)")
+        
+        btn_limpiar = tb.Button(frame_search, text="🧹 Limpiar", bootstyle=SECONDARY, command=self.limpiar_busqueda)
+        btn_limpiar.pack(side=LEFT, padx=5)
+        self.create_tooltip(btn_limpiar, "Limpiar búsqueda (Escape)")
+
+        frame_tabla = tb.Frame(self.app, padding=10)
+        frame_tabla.pack(fill=BOTH, expand=True)
+
+        self.tabla = tb.Treeview(frame_tabla, columns=("ID", "Producto", "Cantidad", "Precio", "Stock Mínimo"), show="headings")
+        for col in ("ID", "Producto", "Cantidad", "Precio", "Stock Mínimo"):
+            self.tabla.heading(col, text=col, command=lambda c=col: self.ordenar_columna(c))
+            if col == "ID":
+                self.tabla.column(col, anchor=CENTER, width=0, stretch=False)
+            else:
+                self.tabla.column(col, anchor=CENTER)
+        self.tabla.pack(fill=BOTH, expand=True)
+        
+        # Bind right-click for context menu
+        self.tabla.bind("<Button-3>", self.mostrar_menu_contextual)
+
+    def agregar_producto(self):
+        nombre = self.entry_nombre.get()
+        cantidad = self.entry_cantidad.get()
+        precio = self.entry_precio.get()
+        stock_minimo = self.entry_stock_minimo.get()
+
+        if not nombre or not cantidad or not precio:
+            messagebox.showwarning("Error", "Los campos Producto, Cantidad y Precio son obligatorios")
+            return
+
+        try:
+            cantidad = int(cantidad)
+            precio = float(precio)
+            stock_minimo = int(stock_minimo) if stock_minimo else 10
+        except ValueError:
+            messagebox.showwarning("Error", "Cantidad y Stock Mínimo deben ser números enteros, precio debe ser decimal")
+            return
+
+        if self.model.producto_existe(nombre):
+            messagebox.showwarning("Error", f"El producto '{nombre}' ya existe")
+            return
+
+        self.model.agregar_producto(nombre, cantidad, precio, stock_minimo)
+        self.limpiar_campos()
+        self.cargar_productos()
+
+    def editar_producto(self):
+        seleccionado = self.tabla.focus()
+        if not seleccionado:
+            messagebox.showwarning("Error", "Seleccione un producto para editar")
+            return
+
+        item = self.tabla.item(seleccionado)
+        producto_id = item['values'][0]
+        producto = self.model.obtener_producto_por_id(producto_id)
+        
+        if producto:
+            self.editando_id = producto_id
+            self.entry_nombre.delete(0, "end")
+            self.entry_nombre.insert(0, producto[1])
+            self.entry_cantidad.delete(0, "end")
+            self.entry_cantidad.insert(0, str(producto[2]))
+            self.entry_precio.delete(0, "end")
+            self.entry_precio.insert(0, str(producto[3]))
+            self.entry_stock_minimo.delete(0, "end")
+            stock_minimo = str(producto[4]) if len(producto) > 4 else "10"
+            self.entry_stock_minimo.insert(0, stock_minimo)
+            
+            # Cambiar texto del botón de agregar a "Actualizar"
+            self.btn_agregar.config(text="💾 Actualizar", bootstyle=WARNING, command=self.actualizar_producto)
+            self.create_tooltip(self.btn_agregar, "Actualizar producto (Enter)")
+
+    def actualizar_producto(self):
+        nombre = self.entry_nombre.get()
+        cantidad = self.entry_cantidad.get()
+        precio = self.entry_precio.get()
+        stock_minimo = self.entry_stock_minimo.get()
+
+        if not nombre or not cantidad or not precio:
+            messagebox.showwarning("Error", "Los campos Producto, Cantidad y Precio son obligatorios")
+            return
+
+        try:
+            cantidad = int(cantidad)
+            precio = float(precio)
+            stock_minimo = int(stock_minimo) if stock_minimo else 10
+        except ValueError:
+            messagebox.showwarning("Error", "Cantidad y Stock Mínimo deben ser números enteros, precio debe ser decimal")
+            return
+
+        if self.model.producto_existe(nombre, self.editando_id):
+            messagebox.showwarning("Error", f"El producto '{nombre}' ya existe")
+            return
+
+        self.model.actualizar_producto(self.editando_id, nombre, cantidad, precio, stock_minimo)
+        self.limpiar_campos()
+        self.cargar_productos()
+        self.restaurar_boton_agregar()
+
+    def restaurar_boton_agregar(self):
+        self.editando_id = None
+        self.btn_agregar.config(text="➕ Agregar", bootstyle=SUCCESS, command=self.agregar_producto)
+        self.create_tooltip(self.btn_agregar, "Agregar nuevo producto (Ctrl+N)")
+
+    def create_tooltip(self, widget, text):
+        def on_enter(event):
+            tooltip = tb.Toplevel()
+            tooltip.wm_overrideredirect(True)
+            tooltip.wm_geometry(f"+{event.x_root+10}+{event.y_root+10}")
+            label = tb.Label(tooltip, text=text, background="lightyellow", relief="solid", borderwidth=1)
+            label.pack()
+            widget.tooltip = tooltip
+
+        def on_leave(event):
+            if hasattr(widget, 'tooltip'):
+                widget.tooltip.destroy()
+                del widget.tooltip
+
+        widget.bind("<Enter>", on_enter)
+        widget.bind("<Leave>", on_leave)
+
+    def eliminar_producto(self):
+        seleccionado = self.tabla.focus()
+        if not seleccionado:
+            messagebox.showwarning("Error", "Seleccione un producto para eliminar")
+            return
+
+        item = self.tabla.item(seleccionado)
+        producto_id = item['values'][0]
+        
+        if messagebox.askyesno("Confirmar", f"¿Está seguro de eliminar el producto ID: {producto_id}?"):
+            self.model.eliminar_producto(producto_id)
+            self.cargar_productos()
+
+    def limpiar_campos(self):
+        self.entry_nombre.delete(0, "end")
+        self.entry_cantidad.delete(0, "end")
+        self.entry_precio.delete(0, "end")
+        self.entry_stock_minimo.delete(0, "end")
+        if self.editando_id:
+            self.restaurar_boton_agregar()
+
+    def cargar_productos(self, filtro=""):
+        for item in self.tabla.get_children():
+            self.tabla.delete(item)
+        
+        productos = self.model.obtener_productos()
+        
+        if filtro:
+            productos = [p for p in productos if filtro.lower() in str(p[1]).lower()]
+        
+        for producto in productos:
+            item_id = self.tabla.insert("", "end", values=producto)
+            
+            # Add visual indicators for low stock
+            if len(producto) >= 3 and producto[2] <= (producto[4] if len(producto) > 4 else 10):
+                self.tabla.item(item_id, tags=("bajo_stock",))
+        
+        # Configure tag colors for low stock
+        self.tabla.tag_configure("bajo_stock", background="#ffcccc")
+
+    def filtrar_productos(self, event=None):
+        texto_busqueda = self.entry_busqueda.get()
+        self.cargar_productos(texto_busqueda)
+
+    def limpiar_busqueda(self):
+        self.entry_busqueda.delete(0, "end")
+        self.cargar_productos()
+
+    def configurar_atajos(self):
+        self.app.bind("<Control-n>", lambda e: self.nuevo_producto())
+        self.app.bind("<Control-N>", lambda e: self.nuevo_producto())
+        self.app.bind("<Delete>", lambda e: self.eliminar_producto())
+        self.app.bind("<Control-f>", lambda e: self.foco_busqueda())
+        self.app.bind("<Control-F>", lambda e: self.foco_busqueda())
+        self.app.bind("<Return>", lambda e: self.guardar_producto())
+        self.app.bind("<Escape>", lambda e: self.cancelar_edicion())
+
+    def nuevo_producto(self):
+        self.limpiar_campos()
+        self.entry_nombre.focus()
+
+    def foco_busqueda(self):
+        self.entry_busqueda.focus()
+        self.entry_busqueda.select_range(0, "end")
+
+    def guardar_producto(self):
+        if self.editando_id:
+            self.actualizar_producto()
+        else:
+            self.agregar_producto()
+
+    def cancelar_edicion(self):
+        if self.editando_id:
+            self.restaurar_boton_agregar()
+        self.limpiar_campos()
+
+    def ordenar_columna(self, columna):
+        productos = self.model.obtener_productos()
+        
+        # Get column index
+        columnas = ["ID", "Producto", "Cantidad", "Precio", "Stock Mínimo"]
+        col_idx = columnas.index(columna)
+        
+        # Sort products
+        productos.sort(key=lambda x: x[col_idx] if x[col_idx] is not None else "")
+        
+        # Reload table
+        for item in self.tabla.get_children():
+            self.tabla.delete(item)
+        
+        for producto in productos:
+            item_id = self.tabla.insert("", "end", values=producto)
+            
+            # Add visual indicators for low stock
+            if len(producto) >= 3 and producto[2] <= (producto[4] if len(producto) > 4 else 10):
+                self.tabla.item(item_id, tags=("bajo_stock",))
+
+    def mostrar_menu_contextual(self, event):
+        seleccionado = self.tabla.identify_row(event.y)
+        if seleccionado:
+            self.tabla.selection_set(seleccionado)
+            
+            menu = tb.Menu(self.app, tearoff=0)
+            menu.add_command(label="Editar", command=self.editar_producto)
+            menu.add_command(label="Eliminar", command=self.eliminar_producto)
+            menu.add_separator()
+            menu.add_command(label="Copiar nombre", command=lambda: self.copiar_nombre(seleccionado))
+            menu.add_command(label="Ver detalles", command=lambda: self.ver_detalles(seleccionado))
+            
+            menu.post(event.x_root, event.y_root)
+
+    def copiar_nombre(self, item_id):
+        item = self.tabla.item(item_id)
+        nombre = item['values'][1]
+        self.app.clipboard_clear()
+        self.app.clipboard_append(nombre)
+        messagebox.showinfo("Copiado", f"Nombre '{nombre}' copiado al portapapeles")
+
+    def ver_detalles(self, item_id):
+        item = self.tabla.item(item_id)
+        producto_id = item['values'][0]
+        producto = self.model.obtener_producto_por_id(producto_id)
+        
+        if producto:
+            stock_minimo = producto[4] if len(producto) > 4 else 10
+            estado = "BAJO STOCK" if producto[2] <= stock_minimo else "OK"
+            color = "rojo" if producto[2] <= stock_minimo else "verde"
+            
+            detalles = f"""
+ID: {producto[0]}
+Producto: {producto[1]}
+Cantidad: {producto[2]}
+Precio: ${producto[3]:.2f}
+Stock Mínimo: {stock_minimo}
+Estado: {estado}
+Valor Total: ${producto[2] * producto[3]:.2f}
+            """
+            
+            messagebox.showinfo("Detalles del Producto", detalles.strip())
+
+    def mostrar_alertas_stock(self):
+        productos_bajo_stock = self.model.obtener_productos_bajo_stock()
+        
+        if not productos_bajo_stock:
+            messagebox.showinfo("Alertas de Stock", "✅ No hay productos con stock bajo")
+            return
+        
+        mensaje = "⚠️ Productos con stock bajo:\n\n"
+        for producto in productos_bajo_stock:
+            stock_minimo = producto[4] if len(producto) > 4 else 10
+            mensaje += f"• {producto[1]}: {producto[2]} unidades (Mínimo: {stock_minimo})\n"
+        
+        mensaje += f"\nTotal: {len(productos_bajo_stock)} productos necesitan reabastecimiento"
+        
+        messagebox.showwarning("Alertas de Stock", mensaje)
+
+    def exportar_csv(self):
+        productos = self.model.obtener_productos()
+        
+        if not productos:
+            messagebox.showinfo("Información", "No hay productos para exportar")
+            return
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
+            initialfile=f"inventario_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        )
+        
+        if filename:
+            try:
+                with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+                    writer = csv.writer(csvfile)
+                    writer.writerow(['ID', 'Producto', 'Cantidad', 'Precio'])
+                    writer.writerows(productos)
+                
+                messagebox.showinfo("Éxito", f"Se exportaron {len(productos)} productos a {filename}")
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudo exportar: {str(e)}")
