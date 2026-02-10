@@ -136,5 +136,9 @@ flake8 .
 - API REST para integración externa
 - Mejoras en los reportes y exportación
 
+## Imagen
+<img width="1599" height="857" alt="software_inventario" src="https://github.com/user-attachments/assets/de92151b-643f-499b-8b52-3d3420470fe7" />
+
+
 Prueba hecha con 💗
 Si quieres mejor esta prueba sientete libre de hacerlo.
