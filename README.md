@@ -141,4 +141,4 @@ flake8 .
 
 
 Prueba hecha con 💗
-Si quieres mejor esta prueba sientete libre de hacerlo.
+Si quieres mejorarlo eres libre de hacerlo.
