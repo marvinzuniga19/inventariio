@@ -8,8 +8,9 @@ import os
 
 
 class InventarioUI:
-    def __init__(self):
-        self.model = InventarioModel()
+    def __init__(self, controller=None):
+        self.controller = controller
+        self.model = controller.model if controller else InventarioModel()
         self.app = tb.Window(themename="superhero")
         self.app.title("Gestor de Inventario")
         self.app.geometry("700x500")
@@ -19,6 +20,10 @@ class InventarioUI:
         self.actualizar_estadisticas()
         self.configurar_atajos()
         self.verificar_alertas_inicio()
+        self.app.mainloop()
+    
+    def run(self):
+        """Run the application."""
         self.app.mainloop()
 
     def _crear_ui(self):

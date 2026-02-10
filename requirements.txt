@@ -1,0 +1,14 @@
+# Core dependencies
+ttkbootstrap>=1.10.0
+
+# Optional dependencies for enhanced features
+reportlab>=3.6.0  # For PDF generation (optional)
+
+# Development dependencies (for testing and development)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=22.0.0
+flake8>=5.0.0
+
+# Note: The application will work without reportlab, but PDF generation will be disabled
+# if reportlab is not available. Install with: pip install reportlab

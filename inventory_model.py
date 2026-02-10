@@ -3,6 +3,7 @@ import sqlite3
 
 class InventarioModel:
     def __init__(self, db_name="inventario.db"):
+        self.db_name = db_name
         self.conn = sqlite3.connect(db_name)
         self.cursor = self.conn.cursor()
         self._crear_tabla()
