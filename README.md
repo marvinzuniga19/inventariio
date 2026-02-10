@@ -136,12 +136,5 @@ flake8 .
 - API REST para integración externa
 - Mejoras en los reportes y exportación
 
----
-
-Si quieres, puedo:
-
-- Ejecutar la suite de tests y adjuntarte el resultado
-- Añadir badges al README (CI, cobertura)
-- Crear un archivo `CONTRIBUTING.md` y plantilla de issues
-
-Dime qué prefieres que haga a continuación.
+Prueba hecha con 💗
+Si quieres mejor esta prueba sientete libre de hacerlo.
