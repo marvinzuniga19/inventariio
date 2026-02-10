@@ -28,167 +28,120 @@ inventario_py/
 
 ### Model (inventory_model.py)
 - **Responsabilidad**: Gestión de datos y persistencia
-- **Funcionalidades**: CRUD de productos, estadísticas, backup/restore
-- **Base de datos**: SQLite con migración automática
+# Sistema de Gestión de Inventario
 
-### View (inventory_ui.py)
-- **Responsabilidad**: Interfaz de usuario y presentación
-- **Tecnología**: ttkbootstrap (temas modernos)
-- **Características**: Tooltips, atajos, menú contextual
+Proyecto en Python para gestionar un inventario con arquitectura MVC, tests y manejo centralizado de errores.
 
-### Controller (inventory_controller.py)
-- **Responsabilidad**: Coordinación entre Model y View
-- **Funcionalidades**: Lógica de negocio, validación, manejo de errores
+## Estructura principal
 
-## 🔧 Componentes de Calidad
-
-### Configuración (inventory_config.py)
-- **Formato**: JSON con valores por defecto
-- **Secciones**: Database, UI, Validation, Logging, Export, Alerts
-- **Características**: Validación, recarga dinámica
-
-### Validación (inventory_validation.py)
-- **Clases**: ProductValidator, DatabaseValidator, FilterValidator
-- **Características**: Reglas configurables, errores específicos
-- **Tipado**: Resultados estructurados con dataclasses
-
-### Manejo de Errores (inventory_error_handler.py)
-- **Jerarquía**: Clases específicas de excepciones
-- **Centralización**: ErrorHandler con callbacks registrables
-- **Decoradores**: @safe_execute y @validate_and_execute
-
-## 🧪 Testing
-
-### Suite de Tests
-- **36 tests**: Cubren modelo, validación y configuración
-- **Cobertura**: CRUD, estadísticas, backup/restore, validación
-- **Ejecución**: `python tests/run_tests.py`
-
-### Tipos de Tests
-- **Unit Tests**: Lógica de negocio y validación
-- **Integration Tests**: Operaciones de base de datos
-- **Configuration Tests**: Gestión de configuración
-
-## 🚀 Instalación y Uso
-
-### Instalación
-```bash
-# Clonar o descargar el proyecto
-cd inventario_py
-
-# Instalar dependencias
-pip install -r requirements.txt
-
-# Para funcionalidad PDF (opcional)
-pip install reportlab
+```
+inventario_py/
+├── main.py
+├── main_improved.py
+├── inventory_model.py
+├── inventory_ui.py
+├── inventory_controller.py
+├── inventory_config.py
+├── inventory_validation.py
+├── inventory_error_handler.py
+├── tests/
+│   ├── run_tests.py
+│   ├── test_inventory_model.py
+│   ├── test_validation.py
+│   └── test_config.py
+├── requirements.txt
+├── config.json        # (autogenerado en la primera ejecución)
+└── inventory.log      # (autogenerado)
 ```
 
-### Ejecución
-```bash
-# Versión original
-python main.py
+## Requisitos
 
-# Versión mejorada con MVC
+- Python 3.10+ (la virtualenv incluida usa 3.14 en desarrollo)
+- Virtual environment recomendado
+- Dependencias en `requirements.txt` (incluye `ttkbootstrap`)
+- Dependencia opcional: `reportlab` para generación de PDFs
+
+Instalación rápida:
+
+```bash
+python -m venv env
+source env/bin/activate
+pip install -r requirements.txt
+# Opcional: pip install reportlab
+```
+
+## Ejecución
+
+- Ejecutar la interfaz principal (UI):
+
+```bash
+python main.py
+```
+
+- Ejecutar la versión mejorada (MVC explícito):
+
+```bash
 python main_improved.py
 ```
 
-### Testing
+## Tests
+
+- Ejecutar la suite de pruebas incluida:
+
 ```bash
-# Ejecutar todos los tests
 python tests/run_tests.py
-
-# Ejecutar tests específicos
-python -m unittest tests.test_inventory_model -v
+# o usando pytest
+pytest -q
 ```
 
-## 📋 Características Implementadas
+## Configuración
 
-### 🎯 Funcionalidad Básica
-- ✅ CRUD completo de productos
-- ✅ Validación de datos
-- ✅ Búsqueda y filtrado
-- ✅ Exportación CSV y PDF
-
-### 🎨 Experiencia de Usuario
-- ✅ Atajos de teclado
-- ✅ Indicadores visuales de stock
-- ✅ Menú contextual (click derecho)
-- ✅ Tooltips e iconos
-
-### 📊 Datos y Reportes
-- ✅ Estadísticas en tiempo real
-- ✅ Sistema de alertas
-- ✅ Reportes PDF profesionales
-- ✅ Backup/Restore de base de datos
-
-### 🏗️ Calidad y Arquitectura
-- ✅ Arquitectura MVC limpia
-- ✅ Testing unitario completo
-- ✅ Configuración externa
-- ✅ Manejo robusto de errores
-
-## 🔀 Flujo de Datos
-
-```
-Usuario → UI → Controller → Model → Database
-         ↓      ↓          ↓        ↓
-     Validar → Validar → Validar → SQL
-         ↓      ↓          ↓        ↓
-   Mostrar ← Resultado ← Error ← Resultado
-```
-
-## 📝 Configuración
-
-El archivo `config.json` se crea automáticamente con valores por defecto:
+El archivo `config.json` se crea automáticamente con valores por defecto al arrancar la aplicación. Valores típicos:
 
 ```json
 {
-  "database": {
-    "name": "inventario.db",
-    "backup_folder": "backups"
-  },
-  "ui": {
-    "theme": "superhero",
-    "geometry": "700x500",
-    "title": "Gestor de Inventario"
-  },
-  "validation": {
-    "min_nombre_length": 2,
-    "max_nombre_length": 100,
-    "default_stock_minimo": 10
-  },
-  "logging": {
-    "level": "INFO",
-    "file": "inventory.log"
-  }
+  "database": { "name": "inventario.db", "backup_folder": "backups" },
+  "ui": { "theme": "superhero", "geometry": "700x500", "title": "Gestor de Inventario" },
+  "validation": { "min_nombre_length": 2, "max_nombre_length": 100, "default_stock_minimo": 10 },
+  "logging": { "level": "INFO", "file": "inventory.log" }
 }
 ```
 
-## 🐛 Manejo de Errores
+## Qué incluye el proyecto
 
-- **Logging**: Todos los errores se registran en `inventory.log`
-- **Excepciones**: Jerarquía de excepciones específicas
-- **Callbacks**: Manejo específico por tipo de error
-- **Recuperación**: Sistema intenta recuperarse de errores
+- Arquitectura MVC separada en `inventory_model.py`, `inventory_controller.py` y `inventory_ui.py`.
+- Validación centralizada en `inventory_validation.py`.
+- Manejo de errores y logging en `inventory_error_handler.py`.
+- Exportación a CSV/PDF (PDF requiere `reportlab`).
+- Backup/restore de la base de datos SQLite.
 
-## 📈 Métricas de Calidad
+## Desarrollo y calidad
 
-- **Tests**: 36 tests unitarios pasando
-- **Cobertura**: Funcionalidad principal cubierta
-- **Arquitectura**: Separación MVC clara
-- **Errores**: Manejo centralizado y logging
-- **Configuración**: Externa y validada
+- Tests unitarios y de integración en `tests/`.
+- Herramientas recomendadas: `black`, `flake8`, `pytest`.
 
-## 🔄 Próximos Pasos
+Comandos útiles:
 
-El sistema está listo para producción con:
-- **Arquitectura escalable**
-- **Testing completo**
-- **Manejo de errores robusto**
-- **Configuración flexible**
+```bash
+# Formatear con Black
+black .
 
-Considerar futuras mejoras:
-- Multi-usuario y permisos
-- Importación masiva
-- API REST
-- Reportes avanzados
+# Ejecutar lint
+flake8 .
+```
+
+## Próximos pasos sugeridos
+
+- Añadir control de usuarios y permisos
+- API REST para integración externa
+- Mejoras en los reportes y exportación
+
+---
+
+Si quieres, puedo:
+
+- Ejecutar la suite de tests y adjuntarte el resultado
+- Añadir badges al README (CI, cobertura)
+- Crear un archivo `CONTRIBUTING.md` y plantilla de issues
+
+Dime qué prefieres que haga a continuación.

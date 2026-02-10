@@ -1,0 +1,35 @@
+{
+  "database": {
+    "name": "inventario.db",
+    "backup_folder": "backups"
+  },
+  "ui": {
+    "theme": "superhero",
+    "geometry": "700x500",
+    "title": "Gestor de Inventario"
+  },
+  "validation": {
+    "min_nombre_length": 2,
+    "max_nombre_length": 100,
+    "min_cantidad": 0,
+    "max_cantidad": 999999,
+    "min_precio": 0.0,
+    "max_precio": 999999.99,
+    "default_stock_minimo": 10
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "inventory.log",
+    "format": "%(asctime)s - %(levelname)s - %(message)s"
+  },
+  "export": {
+    "csv_encoding": "utf-8",
+    "pdf_page_size": "A4",
+    "backup_retention_days": 30
+  },
+  "alerts": {
+    "show_startup_alerts": true,
+    "low_stock_threshold": 0.1,
+    "critical_stock_threshold": 0.0
+  }
+}
