@@ -1,0 +1,39 @@
+2026-02-10 14:18:15,624 - __main__ - INFO - ==================================================
+2026-02-10 14:18:15,625 - __main__ - INFO - Iniciando Sistema de Gestión de Inventario
+2026-02-10 14:18:15,625 - __main__ - INFO - ==================================================
+2026-02-10 14:18:15,625 - __main__ - INFO - Inicializando controlador de la aplicación...
+2026-02-10 14:18:15,626 - __main__ - INFO - Iniciando interfaz de usuario...
+2026-02-10 14:18:15,626 - inventory_controller - INFO - Starting inventory application
+2026-02-10 14:19:04,559 - inventory_controller - ERROR - Failed to start application: can't invoke "grab" command: application has been destroyed
+2026-02-10 14:19:04,559 - root - CRITICAL - Critical error during startup: Error inesperado: can't invoke "grab" command: application has been destroyed
+2026-02-10 14:19:04,570 - root - CRITICAL - Traceback: Traceback (most recent call last):
+  File "/home/marvin/workspace/python/inventario_py/main_improved.py", line 64, in main
+    controller.start_application()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/marvin/workspace/python/inventario_py/inventory_controller.py", line 37, in start_application
+    self.ui = InventarioUI(controller=self)
+              ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/marvin/workspace/python/inventario_py/inventory_ui.py", line 35, in __init__
+    self.verificar_alertas_inicio()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/marvin/workspace/python/inventario_py/inventory_ui.py", line 722, in verificar_alertas_inicio
+    messagebox.showinfo("Sistema de Inventario",
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+                      f"✅ Sistema iniciado correctamente\n\n"
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      f"📦 {stats['total_productos']} productos en inventario\n"
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      f"💰 Valor total: ${stats['valor_total']:,.2f}\n"
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                      f"🎯 Todas las existencias están en niveles óptimos")
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/tkinter/messagebox.py", line 88, in showinfo
+    return _show(title, message, INFO, OK, **options)
+  File "/usr/lib/python3.14/tkinter/messagebox.py", line 76, in _show
+    res = Message(**options).show()
+  File "/usr/lib/python3.14/tkinter/commondialog.py", line 45, in show
+    s = master.tk.call(self.command, *master._options(self.options))
+_tkinter.TclError: can't invoke "grab" command: application has been destroyed
+
+2026-02-10 14:19:04,571 - inventory_controller - INFO - Application shutdown complete
+2026-02-10 14:19:04,571 - __main__ - INFO - Application shutdown complete
